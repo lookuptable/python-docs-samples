@@ -17,6 +17,7 @@ Service Account."""
 
 import base64
 import httplib
+import urllib
 import json
 import time
 
@@ -25,10 +26,10 @@ import httplib2
 from oauth2client.contrib.appengine import AppAssertionCredentials
 import webapp2
 
-SERVICE_ACCOUNT_EMAIL = "YOUR-SERVICE-ACCOUNT-EMAIL"
+SERVICE_ACCOUNT_EMAIL = "serviceaccount@yangguan-esp-gce-qs.iam.gserviceaccount.com"
 HOST = "YOUR-SERVER-PROJECT-ID.appspot.com"
 SERVICE_ACCOUNT = \
-  "projects/YOUR-CLIENT-PROJECT-ID/serviceAccounts/YOUR-SERVICE-ACCOUNT-EMAIL"
+  "projects/yangguan-esp-gce-qs/serviceAccounts/" + SERVICE_ACCOUNT_EMAIL
 
 
 def generate_jwt():
@@ -50,11 +51,10 @@ def generate_jwt():
         "exp": now + 3600,
         # iss is the service account email.
         'iss': SERVICE_ACCOUNT_EMAIL,
-        'sub': SERVICE_ACCOUNT_EMAIL,
+        'scope': "yangguan-esp-gce-qs@appspot.gserviceaccount.com",
         # aud must match 'audience' in the security configuration in your
         # swagger spec.It can be any string.
-        'aud': 'echo.endpoints.sample.google.com',
-        "email": SERVICE_ACCOUNT_EMAIL
+        'aud': 'https://www.googleapis.com/oauth2/v4/token'
     })
 
     headerAndPayload = '{}.{}'.format(
@@ -69,6 +69,24 @@ def generate_jwt():
     signed_jwt = '{}.{}'.format(headerAndPayload, signature)
 
     return signed_jwt
+
+
+def get_id_token():
+    """Request a Google ID token using a JWT."""
+    params = urllib.urlencode({
+        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion': generate_jwt()})
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    conn = httplib.HTTPSConnection("www.googleapis.com")
+    conn.request("POST", "/oauth2/v4/token", params, headers)
+    response = conn.getresponse()
+    if response.status != 200:
+        return '{} {}\n{}'.format(response.status, response.reason,
+                                  response.read())
+
+    res = json.loads(response.read())
+    conn.close()
+    return res['id_token']
 
 
 def make_request(signed_jwt):
@@ -89,6 +107,21 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(res)
 
 
+class TokenPage(webapp2.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        signed_jwt = generate_jwt()
+        self.response.write(signed_jwt)
+
+
+class IdTokenPage(webapp2.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.write(get_id_token())
+
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
+    ('/token', TokenPage),
+    ('/id-token', IdTokenPage),
 ], debug=True)

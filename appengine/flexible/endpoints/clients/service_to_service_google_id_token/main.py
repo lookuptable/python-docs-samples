@@ -21,6 +21,7 @@ import json
 import time
 import urllib
 
+from googleapiclient import discovery
 from google.appengine.api import app_identity
 import webapp2
 
@@ -54,12 +55,16 @@ def generate_jwt(account):
     headerAndPayload = '{}.{}'.format(
         base64.urlsafe_b64encode(header_json),
         base64.urlsafe_b64encode(payload_json))
-    (key_name, signature) = app_identity.sign_blob(headerAndPayload)
-    signed_jwt = '{}.{}'.format(
-        headerAndPayload,
-        base64.urlsafe_b64encode(signature))
 
-    return signed_jwt
+    credentials = AppAssertionCredentials('https://www.googleapis.com/auth/iam')
+    http_auth = credentials.authorize(httplib2.Http())
+    service = discovery.build(serviceName='iam', version='v1', http=http_auth)
+    slist = service.projects().serviceAccounts.signBlob(name=account,
+                                                        body={ 'bytesToSign' : base64.b64encode(headerAndPayload)})
+    result = slist.execute()
+    signature = base64.urlsafe_b64encode(base64.encodestring(res['signature']))
+
+    return headerAndPayload + '.' + signature
 
 
 def get_id_token(account):
