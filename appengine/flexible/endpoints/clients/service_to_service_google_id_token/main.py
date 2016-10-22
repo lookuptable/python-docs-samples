@@ -24,12 +24,12 @@ import urllib
 from google.appengine.api import app_identity
 import webapp2
 
-DEFAUTL_SERVICE_ACCOUNT = "YOUR-CLIENT-PROJECT-ID@appspot.gserviceaccount.com"
-HOST = "YOUR-SERVER-PROJECT-ID.appspot.com"
-TARGET_AUD = "YOUR-SERVER-PROJECT-ID@appspot.gserviceaccount.com"
+DEFAUTL_SERVICE_ACCOUNT = "yangguan-esp-gce-qs@appspot.gserviceaccount.com"
+HOST = "yangguan-esp-gce-qs.appspot.com"
+TARGET_AUD = "yangguan-esp-gce-qs@appspot.gserviceaccount.com"
 
 
-def generate_jwt():
+def generate_jwt(account):
     """Generates a signed JSON Web Token using the Google App Engine default
     service account."""
     now = int(time.time())
@@ -43,7 +43,7 @@ def generate_jwt():
         # expires after one hour.
         "exp": now + 3600,
         # iss is the Google App Engine default service account email.
-        "iss": DEFAUTL_SERVICE_ACCOUNT,
+        "iss": account,
         # scope must match 'audience' for google_id_token in the security
         # configuration in your swagger spec.
         "scope": TARGET_AUD,
@@ -62,11 +62,11 @@ def generate_jwt():
     return signed_jwt
 
 
-def get_id_token():
+def get_id_token(account):
     """Request a Google ID token using a JWT."""
     params = urllib.urlencode({
         'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': generate_jwt()})
+        'assertion': generate_jwt(account)})
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     conn = httplib.HTTPSConnection("www.googleapis.com")
     conn.request("POST", "/oauth2/v4/token", params, headers)
@@ -93,6 +93,22 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(res)
 
 
+class JwtPage(webapp2.RequestHandler):
+    def get(self):
+        account = self.request.get("account", DEFAUTL_SERVICE_ACCOUNT)
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.write(generate_jwt(account))
+
+
+class IdTokenPage(webapp2.RequestHandler):
+    def get(self):
+        account = self.request.get("account", DEFAUTL_SERVICE_ACCOUNT)
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.write(get_id_token(account))
+
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
+    ('/jwt', JwtPage),
+    ('/id-token', IdTokenPage),
 ], debug=True)
