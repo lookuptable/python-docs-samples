@@ -24,6 +24,7 @@ import time
 from googleapiclient.discovery import build
 import httplib2
 from oauth2client.contrib.appengine import AppAssertionCredentials
+from oauth2client.client import GoogleCredentials
 import webapp2
 
 SERVICE_ACCOUNT_EMAIL = "serviceaccount@yangguan-esp-gce-qs.iam.gserviceaccount.com"
@@ -34,10 +35,8 @@ SERVICE_ACCOUNT = \
 
 def generate_jwt():
     """Generates a signed JSON Web Token using a service account."""
-    credentials = AppAssertionCredentials(
-        'https://www.googleapis.com/auth/iam')
-    http_auth = credentials.authorize(httplib2.Http())
-    service = build(serviceName='iam', version='v1', http=http_auth)
+    credentials = GoogleCredentials.get_application_default()
+    service = build(serviceName='iam', version='v1', credentials=credentials)
 
     now = int(time.time())
 
